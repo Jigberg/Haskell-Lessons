@@ -28,6 +28,10 @@ reverse' xs = revInto [] xs
 -- Drop , takes x element from the start of the list and gives you what is left. Drop 2 [1,2,3,4,5] = [3,4,5]
 -- If the Take and Drop exceeds the list Length it gives and leaves you what it can and does NOT give you syntax error. Neg numbers dont give syntax error either.
 
+f []     = []
+f (x:xs) = w ++ [x] 
+   where w = f xs
+
 take n _ | n <= 0 = []
 take _ []          = []
 take n (x:xs)      = x : take (n-1) xs
