@@ -12,7 +12,7 @@ randy = Card Ace Spades
 
 -- a testhand for testing
 testHand :: Hand
-testHand = Add (helen) (Add (randy) (Add(randy) Empty))
+testHand = Add (helen) (Add (randy)Empty)
 
 sizeSteps :: [Integer]
 sizeSteps = [ size testHand , size (Add (Card (Numeric 2) Hearts) 
