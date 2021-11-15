@@ -1,0 +1,2 @@
+writeFile ex1.txt "hello\nworld"   creates ("hello\nworld") file on filepath (ex1.txt).
+readFile :: FilePath -> IO String
