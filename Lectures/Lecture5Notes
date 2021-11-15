@@ -1,2 +1,8 @@
 writeFile ex1.txt "hello\nworld"   creates ("hello\nworld") file on filepath (ex1.txt).
 readFile :: FilePath -> IO String
+
+using a <- we can extract the type from an IO.
+contents <- getLine, gives the string.
+
+return is tricky, It is badly named and there is an alternative that works exactly the same known as "pure". insted of return use pure.
+To minimize confusion.  
