@@ -1,6 +1,7 @@
 module Sudoku where
 
 import Test.QuickCheck
+import Data.List
 
 ------------------------------------------------------------------------------
 
@@ -36,11 +37,10 @@ example =
 
 -- | allBlankSudoku is a sudoku with just blanks
 allBlankSudoku :: Sudoku
-allBlankSudoku = Sudoku
-    replicate 9 (replicate 9 n)
-  where
-    n = Nothing
-    j = Just
+allBlankSudoku = Sudoku [ [Nothing | _ <- [1..9] ] | _ <- [1..9] ]
+
+falseSudoku :: Sudoku
+falseSudoku = Sudoku [ [Just 10 | _ <- [1..5] ] | _ <- [1..5] ]
 
 
 -- * A2
@@ -48,14 +48,30 @@ allBlankSudoku = Sudoku
 -- | isSudoku sud checks if sud is really a valid representation of a sudoku
 -- puzzle
 isSudoku :: Sudoku -> Bool
-isSudoku = undefined
+isSudoku (Sudoku []) = False
+isSudoku (Sudoku rows) = if length rows == 9
+                          then checkRows (Sudoku rows)
+                          else False
+
+checkRows :: Sudoku -> Bool
+checkRows (Sudoku [])     = True
+checkRows (Sudoku (x:xs)) = check1Row x && length x == 9 && checkRows (Sudoku xs)
+
+check1Row :: Row -> Bool
+check1Row []     = True
+check1Row (x:xs) = checkCell x  && check1Row xs
+
+checkCell :: Cell -> Bool
+checkCell Nothing = True
+checkCell (Just n) = n >= 1 && n <= 9
 
 -- * A3
 
 -- | isFilled sud checks if sud is completely filled in,
 -- i.e. there are no blanks
 isFilled :: Sudoku -> Bool
-isFilled = undefined
+isFilled (Sudoku [] )    = True 
+isFilled (Sudoku (x:xs)) = not (Nothing `elem` x) && isFilled (Sudoku xs)
 
 ------------------------------------------------------------------------------
 
