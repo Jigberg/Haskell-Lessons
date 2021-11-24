@@ -1,0 +1,37 @@
+Lazy evaluation / Call-by-need
+This type of funtion will only be evalutated between 0 and 1 times.
+It is non-strict which means that it will not call something that it does not use.
+We can see an output before the whole input has been read.
+Does less work.
+
+
+Readfile is lazy
+
+Your own functions might not be suited for lazyness. Recursevie functions might be done so that they have to get all the data first.
+Below is an example. It will have to "calcluate" / add everything to the data stack and then sum it. Instead of summing as it goes along. 
+
+sum0 [] = 0
+sum0 (n:ns) = n + sum0 ns
+1+(2+(3+(4+(5+ ... ))))
+
+U might get syntax errors from the code above, to fix this will we do tail recirsive. 
+
+sum1 = s 0
+ where s acc []     = acc
+       s acc (n:ns) = s (n+acc) ns
+
+´seq´ :: a -> b -> b
+forces an argument to be evaluated
+
+sum2 = s 0
+ where s acc []     = acc
+       s acc (n:ns) = acc `seq` s (n+acc) ns¨
+
+
+An example of lazy is that when you readFile you can still be reading it even when you try to writeFile. U can not do them at same time.
+U have to finish reading before, but lazy can screw you. 
+
+import qualified System.IO.strict   allows u to use
+strictReadFile, that unlike readFile, reads everything
+
+par , pseq , seq 
