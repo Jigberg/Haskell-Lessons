@@ -51,3 +51,10 @@ repeat 1
 -- Repeats the cycle forever. 
 cycle [1,2,3]
 >> [1,2,3,1,2,3,1,2,3,1,2,3..]
+
+listToMaybe :: [a] -> Maybe a
+listToMaybe [1..10]
+>> Just 1
+
+listToMaybe []
+>> Nothing
