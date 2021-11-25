@@ -35,3 +35,25 @@ import qualified System.IO.strict   allows u to use
 strictReadFile, that unlike readFile, reads everything
 
 par , pseq , seq 
+
+
+
+
+Lesson 
+
+
+
+where will account for the whole thing. But pattern matching functions like
+
+f 0 y = g + y
+f x y = x + y + g
+ where g = 10
+
+above where there is 2 functions. Where only works on the lower one.
+
+below is a way to use pattern matching without fuckning with where
+
+f x y = case x of
+      0 -> g you
+      x' -> g (x' * y)
+     where g n = 3 * n + 1
