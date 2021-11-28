@@ -2,6 +2,7 @@ module Sudoku where
 
 import Test.QuickCheck
 import Data.List
+import Data.Char(digitToInt)
 
 ------------------------------------------------------------------------------
 
@@ -55,7 +56,8 @@ isSudoku (Sudoku rows) = if length rows == 9
 
 checkRows :: Sudoku -> Bool
 checkRows (Sudoku [])     = True
-checkRows (Sudoku (x:xs)) = check1Row x && length x == 9 && checkRows (Sudoku xs)
+checkRows (Sudoku (x:xs)) = check1Row x && length x == 9 
+                            && checkRows (Sudoku xs)
 
 check1Row :: Row -> Bool
 check1Row []     = True
@@ -80,14 +82,34 @@ isFilled (Sudoku (x:xs)) = not (Nothing `elem` x) && isFilled (Sudoku xs)
 -- | printSudoku sud prints a nice representation of the sudoku sud on
 -- the screen
 printSudoku :: Sudoku -> IO ()
-printSudoku = undefined
+printSudoku sudoku = putStr (stringSudoku sudoku)
+
+stringSudoku :: Sudoku -> String
+stringSudoku (Sudoku []) = ""
+stringSudoku (Sudoku(x:xs)) = (toString x "") ++ stringSudoku (Sudoku xs)
+
+toString :: Row -> String -> String
+toString [] str             = str ++ "\n"
+toString (Nothing : xs) str = toString xs (str ++ " " ++ ".")
+toString ((Just n): xs) str = toString xs (str ++ " " ++ (show n))
+
 
 -- * B2
 
 -- | readSudoku file reads from the file, and either delivers it, or stops
 -- if the file did not contain a sudoku
 readSudoku :: FilePath -> IO Sudoku
-readSudoku = undefined
+readSudoku filepath = do
+                      string <- readFile filepath
+                      return (Sudoku (sudokuString [[] |_ <- [1..9] ] string))
+
+sudokuString :: [Row] -> String -> [Row]
+sudokuString rows "" = rows
+sudokuString (r:rs) (c:cs) 
+ | c == '\n' = r:(sudokuString rs cs)
+ | c == '.' = sudokuString ((r ++ [Nothing]):rs) cs
+ | c == ' ' = sudokuString (r:rs) cs
+ | otherwise = sudokuString ((r ++ [(Just (digitToInt c))]):rs) cs
 
 ------------------------------------------------------------------------------
 
@@ -95,21 +117,26 @@ readSudoku = undefined
 
 -- | cell generates an arbitrary cell in a Sudoku
 cell :: Gen (Cell)
-cell = undefined
+cell = frequency [(9,chooseNothing),(1,chooseNumber)]
 
+chooseNumber = elements [Just x| x <- [1..9]]
+
+chooseNothing = elements [Nothing]
 
 -- * C2
 
 -- | an instance for generating Arbitrary Sudokus
 instance Arbitrary Sudoku where
-  arbitrary = undefined
+  arbitrary = do
+    rows <- vectorOf 9 $ vectorOf 9 cell
+    return (Sudoku rows)
 
  -- hint: get to know the QuickCheck function vectorOf
  
 -- * C3
 
 prop_Sudoku :: Sudoku -> Bool
-prop_Sudoku = undefined
+prop_Sudoku sudoku = isSudoku sudoku
   -- hint: this definition is simple!
   
 ------------------------------------------------------------------------------
@@ -120,21 +147,49 @@ type Block = [Cell] -- a Row is also a Cell
 -- * D1
 
 isOkayBlock :: Block -> Bool
-isOkayBlock = undefined
+isOkayBlock block = repeated block
+
+repeated :: [Cell] -> Bool
+repeated [] = True
+repeated (x:xs)
+ | x == Nothing = repeated xs
+ | otherwise = not (elem x xs) && repeated xs
 
 
 -- * D2
 
+
 blocks :: Sudoku -> [Block]
-blocks = undefined
+blocks sudoku = [createBlock sudoku (3*y) (3*x) | y <- [0..2], x <- [0..2]]
+
+createBlock :: Sudoku -> Int -> Int -> Block
+createBlock (Sudoku rows) y x = [rows !! k !! n | n <- [x..x+2], k <- [y..y+2]]
 
 prop_blocks_lengths :: Sudoku -> Bool
-prop_blocks_lengths = undefined
+prop_blocks_lengths (Sudoku rows) = length (blocks (Sudoku rows)) == 9 
+                                    && all (==True) block
+    where block = [length n == 9 | n <- (blocks $ Sudoku rows)]
 
 -- * D3
 
 isOkay :: Sudoku -> Bool
-isOkay = undefined
+isOkay (Sudoku rows) = rowBool rows && colBool [0..8] rows 
+                       && blockBool (blocks (Sudoku rows))
+
+blockBool :: [Block] -> Bool
+blockBool [] = True
+blockBool (x:xs) = repeated x && blockBool xs 
+
+rowBool :: [Row] -> Bool
+rowBool [] = True
+rowBool (x:xs) = repeated x && rowBool xs
+
+colBool :: [Int] -> [Row] -> Bool 
+colBool [] rows = True
+colBool (x:xs) rows = repeated (createCol rows x) && colBool xs rows
+
+createCol :: [Row] -> Int -> Row
+createCol rows int = [x !! int | x <- rows]
 
 
 ---- Part A ends here --------------------------------------------------------

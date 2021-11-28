@@ -16,6 +16,14 @@ filter even [1..10]
 elem 1 [1..10]
 >> True
 
+-- Creates a list with an item bool/int/char int many times.
+replicate 5 True  or   replicate 5 5
+>> [True,True,True,True,True]   [5,5,5,5,5]
+
+-- Takes specific item from list.
+[1,2,3,4,5]!!2
+>> 3
+
 -- Returns the "argument" first items of the list. WORKS ON infintive lists!
 take 7 [1..10]
 >> [1,2,3,4,5,6,7]
@@ -58,3 +66,16 @@ listToMaybe [1..10]
 
 listToMaybe []
 >> Nothing
+
+-- Takes an item from a list and generates 1 value. a Gen.
+elements [1..10]
+>> generates of the given values.
+
+-- Chooses 1 of the generator functions in the list based on the weighted value in front. Then calls it. 
+frequency [ (9,funcGenerator1) , (1,funcGenerator2) ]
+funcGenerator1 ...
+funcGenerator2 ...
+
+-- Takes an int and a generator function and creates a list of that int size. 
+vectorOf 3 funcGenerator1
+>> [funcGenerator1,funcGenerator1,funcGenerator1]
