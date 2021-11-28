@@ -11,6 +11,18 @@ x = getLine
 
 
 
+-- Do expressions
+f int -> int
+f x = do
+
+
+-- List comprehensions
+-- Split with a guard, the right side of the guard is for an expression changing/modifying the left side. 
+[toUpper c | c <- s]
+
+
+
+
 -- Syntax in Functions    Pattern Matching   Guards   Let it Be   Case expressions
 
 -- pattern matching is one way to construct a function in haskell. We call this   Syntax in Functions
