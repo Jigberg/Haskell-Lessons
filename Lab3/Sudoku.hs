@@ -49,19 +49,10 @@ falseSudoku = Sudoku [ [Just 10 | _ <- [1..5] ] | _ <- [1..5] ]
 -- | isSudoku sud checks if sud is really a valid representation of a sudoku
 -- puzzle
 isSudoku :: Sudoku -> Bool
-isSudoku (Sudoku []) = False
-isSudoku (Sudoku rows) = if length rows == 9
-                          then checkRows (Sudoku rows)
-                          else False
-
-checkRows :: Sudoku -> Bool
-checkRows (Sudoku [])     = True
-checkRows (Sudoku (x:xs)) = check1Row x && length x == 9 
-                            && checkRows (Sudoku xs)
+isSudoku (Sudoku rows) = all check1Row rows
 
 check1Row :: Row -> Bool
-check1Row []     = True
-check1Row (x:xs) = checkCell x  && check1Row xs
+check1Row row = all checkCell row && length row == 9
 
 checkCell :: Cell -> Bool
 checkCell Nothing = True
@@ -72,8 +63,7 @@ checkCell (Just n) = n >= 1 && n <= 9
 -- | isFilled sud checks if sud is completely filled in,
 -- i.e. there are no blanks
 isFilled :: Sudoku -> Bool
-isFilled (Sudoku [] )    = True 
-isFilled (Sudoku (x:xs)) = not (Nothing `elem` x) && isFilled (Sudoku xs)
+isFilled (Sudoku rows) = not $ all (elem Nothing) rows
 
 ------------------------------------------------------------------------------
 
@@ -98,17 +88,20 @@ toString ((Just n): xs) str = toString xs (str ++ " " ++ (show n))
 
 -- | readSudoku file reads from the file, and either delivers it, or stops
 -- if the file did not contain a sudoku
-readSudoku :: FilePath -> IO Sudoku
-readSudoku filepath = do
+getSudoku :: FilePath -> IO Sudoku
+getSudoku filepath = do
                       string <- readFile filepath
-                      return (Sudoku (sudokuString [[] |_ <- [1..9] ] string))
+                      return (Sudoku (checkSudoku [[] |_ <- [1..9] ] string))
+
+checkSudoku :: [Row] -> String -> [Row]
+checkSudoku rows string = if isSudoku $ Sudoku (sudokuString rows string) then sudokuString rows string
+                     else error "Shit, that aint a Sudoku!"
 
 sudokuString :: [Row] -> String -> [Row]
 sudokuString rows "" = rows
 sudokuString (r:rs) (c:cs) 
  | c == '\n' = r:(sudokuString rs cs)
  | c == '.' = sudokuString ((r ++ [Nothing]):rs) cs
- | c == ' ' = sudokuString (r:rs) cs
  | otherwise = sudokuString ((r ++ [(Just (digitToInt c))]):rs) cs
 
 ------------------------------------------------------------------------------
@@ -121,7 +114,7 @@ cell = frequency [(9,chooseNothing),(1,chooseNumber)]
 
 chooseNumber = elements [Just x| x <- [1..9]]
 
-chooseNothing = elements [Nothing]
+chooseNothing = return Nothing
 
 -- * C2
 
@@ -153,17 +146,23 @@ repeated :: [Cell] -> Bool
 repeated [] = True
 repeated (x:xs)
  | x == Nothing = repeated xs
- | otherwise = not (elem x xs) && repeated xs
+ | otherwise = x `notElem` xs && repeated xs
 
 
 -- * D2
 
 
 blocks :: Sudoku -> [Block]
-blocks sudoku = [createBlock sudoku (3*y) (3*x) | y <- [0..2], x <- [0..2]]
+blocks sudoku = [createBlock sudoku (3*y) (3*x) | y <- [0..2], x <- [0..2]]++ rows sudoku ++ createCol [] (rows sudoku)
 
 createBlock :: Sudoku -> Int -> Int -> Block
 createBlock (Sudoku rows) y x = [rows !! k !! n | n <- [x..x+2], k <- [y..y+2]]
+
+createCol :: [Row] -> [Row] -> [Row]
+createCol col row
+  | length col == 9 = col
+  | otherwise = createCol (col ++ [map head row]) (map tail row) 
+
 
 prop_blocks_lengths :: Sudoku -> Bool
 prop_blocks_lengths (Sudoku rows) = length (blocks (Sudoku rows)) == 9 
@@ -173,24 +172,7 @@ prop_blocks_lengths (Sudoku rows) = length (blocks (Sudoku rows)) == 9
 -- * D3
 
 isOkay :: Sudoku -> Bool
-isOkay (Sudoku rows) = rowBool rows && colBool [0..8] rows 
-                       && blockBool (blocks (Sudoku rows))
-
-blockBool :: [Block] -> Bool
-blockBool [] = True
-blockBool (x:xs) = repeated x && blockBool xs 
-
-rowBool :: [Row] -> Bool
-rowBool [] = True
-rowBool (x:xs) = repeated x && rowBool xs
-
-colBool :: [Int] -> [Row] -> Bool 
-colBool [] rows = True
-colBool (x:xs) rows = repeated (createCol rows x) && colBool xs rows
-
-createCol :: [Row] -> Int -> Row
-createCol rows int = [x !! int | x <- rows]
-
+isOkay (Sudoku rows) = all repeated rows
 
 ---- Part A ends here --------------------------------------------------------
 ------------------------------------------------------------------------------
@@ -204,34 +186,43 @@ type Pos = (Int,Int)
 -- * E1
 
 blanks :: Sudoku -> [Pos]
-blanks = undefined
+blanks (Sudoku rows) = [ (n, k) | n <- [0..8], k <- [0..8], rows !! n !! k == Nothing ]
 
---prop_blanks_allBlanks :: ...
---prop_blanks_allBlanks =
+prop_blanks_allBlanks :: Bool
+prop_blanks_allBlanks = length (blanks allBlankSudoku) == 81
 
 
 -- * E2
 
 (!!=) :: [a] -> (Int,a) -> [a]
-xs !!= (i,y) = undefined
+xs !!= (i,y) = (take i first) ++ (y:last)
+               where (first,last) = splitAt (i+1) xs
 
---prop_bangBangEquals_correct :: ...
---prop_bangBangEquals_correct =
+prop_bangBangEquals_correct :: (Eq a) => [a] -> (Int, a) -> Bool
+prop_bangBangEquals_correct list (int, a) = ((list !!= (modint, a)) !! modint) == a
+    where modint = int `mod` (length list + 1)
 
 
 -- * E3
 
 update :: Sudoku -> Pos -> Cell -> Sudoku
-update = undefined
+update (Sudoku rows) (r,c) cell = Sudoku ( rows !!= (r,((rows !! r) !!= (c,cell))) )
 
---prop_update_updated :: ...
---prop_update_updated =
+prop_update_updated :: Sudoku -> Pos -> Cell -> Bool
+prop_update_updated (Sudoku rows) (r,c) cell = getCell (update (Sudoku rows) (r,c) cell) (r,c) == cell 
+
+getCell :: Sudoku -> Pos -> Cell
+getCell (Sudoku rows) (r,c) = ((rows!!r)!!c)
 
 
 ------------------------------------------------------------------------------
 
 -- * F1
 
+-- disposal =  blanks getcell update isOkay update
+
+--solve :: Sudoku -> Maybe Sudoku
+--solve sudoku = 
 
 -- * F2
 
