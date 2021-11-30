@@ -20,9 +20,13 @@ elem 1 [1..10]
 replicate 5 True  or   replicate 5 5
 >> [True,True,True,True,True]   [5,5,5,5,5]
 
--- Takes specific item from list.
+-- Takes specific item from list depending on spot.
 [1,2,3,4,5]!!2
 >> 3
+
+-- Given a list and a bool statement check all values in the list. The bool statement can be a function. 
+all (<5) [1,2,3,4]
+>> True
 
 -- Returns the "argument" first items of the list. WORKS ON infintive lists!
 take 7 [1..10]
