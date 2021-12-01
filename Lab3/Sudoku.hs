@@ -219,35 +219,35 @@ getCell (Sudoku rows) (r,c) = ((rows!!r)!!c)
 
 -- * F1
 
--- disposal =  blanks getcell update isOkay update
+solve :: Sudoku -> Maybe Sudoku
+solve sudoku = head (lazyLoop sudoku [])
 
---solve :: Sudoku -> Maybe Sudoku
---solve sudoku = 
+lazyLoop :: Sudoku -> [Maybe Sudoku] -> [Maybe Sudoku]
+lazyLoop sudoku sudList = lazyLoop sudoku (sudList ++ (keepGoing sudoku 0 (blanks sudoku)) )
 
--- * F2
+keepGoing :: Sudoku -> Int -> [Pos] -> [Maybe Sudoku]
+keepGoing sudoku i emptyList
+ | (length $ emptyList) < i = [(Just sudoku)]
+ | testCurrentCell sudoku i emptyList (getCell sudoku (emptyList!!i)) == (Just 10) = keepGoing (update sudoku (emptyList!!1) (increaseCellBefore sudoku (i-1) emptyList)) (i-1)  emptyList
+ | otherwise = keepGoing (update sudoku (emptyList!!i) (testCurrentCell sudoku i emptyList (Just 1))) (i+1) emptyList
 
--- Sort from Blanks, get keep track where we are in that list.
--- When pos is placed with a rand number (of available number), keep going.
--- If no fit go back to the last spot and change number.
+testCurrentCell :: Sudoku -> Int -> [Pos] -> Cell -> Cell
+testCurrentCell sudoku i emptyList newCell
+ | isOkay $ update sudoku (emptyList!!i) newCell = newCell
+ | newCell == (Just 10) = newCell
+ | otherwise = testCurrentCell sudoku i emptyList (increaseJust newCell)
 
+increaseCellBefore :: Sudoku -> Int -> [Pos] -> Cell
+increaseCellBefore sudoku i emptyList
+ | isOkay $ update sudoku (emptyList!!i) (increaseJust cell) = (increaseJust cell)
+ | cell == (Just 10) = increaseCellBefore sudoku (i-1) emptyList
+ | otherwise = increaseCellBefore (update sudoku (emptyList!!i) (increaseJust cell)) i emptyList
+                where cell = getCell sudoku (emptyList!!i)
 
--- Just 0 for "no viable answer found". 
-getOkayCell :: Sudoku -> Pos -> Int -> Cell
-getOkayCell sudoku pos n
- | isOkay $ update sudoku pos $ numberPicker n = numberPicker n
- |numberPicker n == (Just 0) = Just 0
- | otherwise = getOkayCell sudoku pos (n+1) 
-
-numberPicker :: Int -> Cell
-numberPicker n = if 8 < n then (Just 0)
-                 else [Just x| x <- [1..9]]!!n
-
-
+increaseJust :: Cell -> Cell
+increaseJust (Just n) = (Just (n+1))
 
 -- * F3
 
 
 -- * F4
-
-
-solve take function
