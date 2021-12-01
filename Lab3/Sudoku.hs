@@ -226,8 +226,28 @@ getCell (Sudoku rows) (r,c) = ((rows!!r)!!c)
 
 -- * F2
 
+-- Sort from Blanks, get keep track where we are in that list.
+-- When pos is placed with a rand number (of available number), keep going.
+-- If no fit go back to the last spot and change number.
+
+
+-- Just 0 for "no viable answer found". 
+getOkayCell :: Sudoku -> Pos -> Int -> Cell
+getOkayCell sudoku pos n
+ | isOkay $ update sudoku pos $ numberPicker n = numberPicker n
+ |numberPicker n == (Just 0) = Just 0
+ | otherwise = getOkayCell sudoku pos (n+1) 
+
+numberPicker :: Int -> Cell
+numberPicker n = if 8 < n then (Just 0)
+                 else [Just x| x <- [1..9]]!!n
+
+
 
 -- * F3
 
 
 -- * F4
+
+
+solve take function
