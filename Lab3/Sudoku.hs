@@ -35,6 +35,14 @@ example =
     n = Nothing
     j = Just
 
+example1 :: Sudoku
+example1 =
+    Sudoku
+      [[],[],[],[],[],[],[],[],[]]
+  where
+    n = Nothing
+    j = Just
+
 testExample :: Sudoku
 testExample =
     Sudoku
@@ -67,7 +75,7 @@ falseSudoku = Sudoku [ [Just 10 | _ <- [1..5] ] | _ <- [1..5] ]
 -- | isSudoku sud checks if sud is really a valid representation of a sudoku
 -- puzzle
 isSudoku :: Sudoku -> Bool
-isSudoku (Sudoku rows) = all check1Row rows
+isSudoku sudoku = all check1Row (rows sudoku) && length (rows sudoku) == 9
 
 check1Row :: Row -> Bool
 check1Row row = all checkCell row && length row == 9
@@ -106,8 +114,8 @@ toString ((Just n): xs) str = toString xs (str ++ " " ++ (show n))
 
 -- | readSudoku file reads from the file, and either delivers it, or stops
 -- if the file did not contain a sudoku
-getSudoku :: FilePath -> IO Sudoku
-getSudoku filepath = do
+readSudoku :: FilePath -> IO Sudoku
+readSudoku filepath = do
                       string <- readFile filepath
                       return (Sudoku (checkSudoku [[] |_ <- [1..9] ] string))
 
@@ -183,9 +191,8 @@ createCol col row
 
 
 prop_blocks_lengths :: Sudoku -> Bool
-prop_blocks_lengths (Sudoku rows) = length (blocks (Sudoku rows)) == 9 
-                                    && all (==True) block
-    where block = [length n == 9 | n <- (blocks $ Sudoku rows)]
+prop_blocks_lengths sudoku = length (blocks sudoku) == 27 && all (==True) block
+    where block = [length n == 9 | n <- (blocks sudoku)]
 
 -- * D3
 
@@ -213,8 +220,15 @@ prop_blanks_allBlanks = [(n,k) | n <- [0..8], k <- [0..8]] == blanks allBlankSud
 -- * E2
 
 (!!=) :: [a] -> (Int,a) -> [a]
-xs !!= (i,y) = (take i first) ++ (y:last)
-               where (first,last) = splitAt (i+1) xs
+[] !!= _ = []
+l@(x:[]) !!= (i,y)
+ | i == 0    = [y]                           
+ | otherwise = l
+l@(x:xs) !!= (i,y)
+ | i < 0                                        
+ || i > (length l-1) = l                            
+ | i == 0            = y : xs 
+ | otherwise = x : (xs !!= (i-1, y))
 
 prop_bangBangEquals_correct :: String -> (Int, Char) -> Bool
 prop_bangBangEquals_correct s p@(i, c) 
@@ -224,11 +238,19 @@ prop_bangBangEquals_correct s p@(i, c)
 
 -- * E3
 
-update :: Sudoku -> Pos -> Cell -> Sudoku
-update (Sudoku rows) (r,c) cell = Sudoku ( rows !!= (r,((rows !! r) !!= (c,cell))) )
+--update :: Sudoku -> Pos -> Cell -> Sudoku
+--update (Sudoku rows) (r,c) cell = Sudoku ( rows !!= (r,((rows !! r) !!= (c,cell))) )
 
-prop_update_updated :: Sudoku -> Pos -> Cell -> Bool
-prop_update_updated (Sudoku rows) (r,c) cell = getCell (update (Sudoku rows) (r,c) cell) (r,c) == cell 
+update :: Sudoku -> Pos -> Cell -> Sudoku
+update sud (r, c) _
+ | r < 0 || c < 0 || r > 8 || c > 8 = sud 
+update (Sudoku rs) pos c = Sudoku (rs !!= (fst pos, newR))
+          where newR = (rs !! fst pos) !!= (snd pos,c)
+
+prop_update_updated :: Sudoku -> Pos -> Cell -> Property 
+prop_update_updated sud (row, col) c = abs row < 9 && abs col < 9 ==> pos (update sud p c) == c
+          where p = (abs row, abs col)
+                pos s = rows s !! abs row !! abs col
 
 getCell :: Sudoku -> Pos -> Cell
 getCell (Sudoku rows) (r,c) = ((rows!!r)!!c)
@@ -256,12 +278,14 @@ possibleMoves pos s = filter isOkay [update s pos (Just n) | n <- range]
 
 readAndSolve :: FilePath -> IO ()
 readAndSolve filepath = do
-                        sudoku <- getSudoku filepath 
+                        sudoku <- readSudoku filepath 
                         printSudoku $ fromJust (solve sudoku)
 
 isSolutionOf :: Sudoku -> Sudoku -> Bool
-isSolutionOf solution sudoku = ((map (getCell sudoku) keptPos) == (map (getCell solution) keptPos)) && (isOkay solution)
+isSolutionOf solution sudoku = ((map (getCell sudoku) keptPos) == 
+  (map (getCell solution) keptPos)) && (isOkay solution) && (isFilled solution)
  where keptPos = ((blanks allBlankSudoku)\\(blanks sudoku))
+
 
 prop_SolveSound :: Sudoku -> Property
 prop_SolveSound s = isSudoku s && isOkay s && isJust (solve s) ==> fromJust (solve s) `isSolutionOf` s
