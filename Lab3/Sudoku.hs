@@ -3,6 +3,7 @@ module Sudoku where
 import Test.QuickCheck
 import Data.List
 import Data.Char(digitToInt)
+import Data.Maybe
 
 ------------------------------------------------------------------------------
 
@@ -29,6 +30,23 @@ example =
       , [n  ,n  ,j 5,j 3,n  ,j 8,j 9,n  ,n  ]
       , [n  ,j 8,j 3,n  ,n  ,n  ,n  ,j 6,n  ]
       , [n  ,n  ,j 7,j 6,j 9,n  ,n  ,j 4,j 3]
+      ]
+  where
+    n = Nothing
+    j = Just
+
+testExample :: Sudoku
+testExample =
+    Sudoku
+      [ [j 3,j 6,j 4,j 8,j 7,j 1,j 2,j 9,j 5]
+      , [j 7,j 5,j 2,j 9,j 3,j 6,j 1,j 8,j 4]
+      , [j 8,j 1,j 9,j 2,j 5,j 4,j 7,j 3,j 6]
+      , [j 5,j 9,j 6,j 7,j 1,j 3,j 4,j 2,j 8]
+      , [j 4,j 3,j 1,j 5,j 8,j 2,j 6,j 7,j 9]
+      , [j 2,j 7,j 8,j 4,j 6,j 9,j 3,j 5,j 1]
+      , [j 6,j 4,j 5,j 3,j 2,j 8,j 9,j 1,j 7]
+      , [j 9,j 8,j 3,j 1,j 4,j 7,j 5,j 6,j 2]
+      , [j 1,j 2,j 7,j 6,j 9,j 5,j 8,j 4,j 3]
       ]
   where
     n = Nothing
@@ -172,7 +190,7 @@ prop_blocks_lengths (Sudoku rows) = length (blocks (Sudoku rows)) == 9
 -- * D3
 
 isOkay :: Sudoku -> Bool
-isOkay (Sudoku rows) = all repeated rows
+isOkay sudoku = (all repeated $ rows sudoku) && (all repeated $ blocks sudoku) && (all repeated $ createCol [] $ rows sudoku)
 
 ---- Part A ends here --------------------------------------------------------
 ------------------------------------------------------------------------------
@@ -189,7 +207,7 @@ blanks :: Sudoku -> [Pos]
 blanks (Sudoku rows) = [ (n, k) | n <- [0..8], k <- [0..8], rows !! n !! k == Nothing ]
 
 prop_blanks_allBlanks :: Bool
-prop_blanks_allBlanks = length (blanks allBlankSudoku) == 81
+prop_blanks_allBlanks = [(n,k) | n <- [0..8], k <- [0..8]] == blanks allBlankSudoku
 
 
 -- * E2
@@ -198,10 +216,11 @@ prop_blanks_allBlanks = length (blanks allBlankSudoku) == 81
 xs !!= (i,y) = (take i first) ++ (y:last)
                where (first,last) = splitAt (i+1) xs
 
-prop_bangBangEquals_correct :: (Eq a) => [a] -> (Int, a) -> Bool
-prop_bangBangEquals_correct list (int, a) = ((list !!= (modint, a)) !! modint) == a
-    where modint = int `mod` (length list + 1)
-
+prop_bangBangEquals_correct :: String -> (Int, Char) -> Bool
+prop_bangBangEquals_correct s p@(i, c) 
+ | i > length s -1 
+ || i < 0     = (s !!= p) == s
+ | otherwise  = ((s !!= p) !! i) == c 
 
 -- * E3
 
@@ -217,37 +236,32 @@ getCell (Sudoku rows) (r,c) = ((rows!!r)!!c)
 
 ------------------------------------------------------------------------------
 
--- * F1
-
 solve :: Sudoku -> Maybe Sudoku
-solve sudoku = head (lazyLoop sudoku [])
+solve sudoku
+ | solutions /= [] = Just $ head solutions
+ | otherwise = Nothing
+  where solutions = solve' sudoku
 
-lazyLoop :: Sudoku -> [Maybe Sudoku] -> [Maybe Sudoku]
-lazyLoop sudoku sudList = lazyLoop sudoku (sudList ++ (keepGoing sudoku 0 (blanks sudoku)) )
+solve' :: Sudoku -> [Sudoku]
+solve' sudoku
+ | null $ blanks sudoku = [sudoku] 
+ | otherwise = concatMap solve' possibleBoards
+  where b:bs = blanks sudoku
+        possibleBoards = possibleMoves b sudoku
 
-keepGoing :: Sudoku -> Int -> [Pos] -> [Maybe Sudoku]
-keepGoing sudoku i emptyList
- | (length $ emptyList) < i = [(Just sudoku)]
- | testCurrentCell sudoku i emptyList (getCell sudoku (emptyList!!i)) == (Just 10) = keepGoing (update sudoku (emptyList!!1) (increaseCellBefore sudoku (i-1) emptyList)) (i-1)  emptyList
- | otherwise = keepGoing (update sudoku (emptyList!!i) (testCurrentCell sudoku i emptyList (Just 1))) (i+1) emptyList
-
-testCurrentCell :: Sudoku -> Int -> [Pos] -> Cell -> Cell
-testCurrentCell sudoku i emptyList newCell
- | isOkay $ update sudoku (emptyList!!i) newCell = newCell
- | newCell == (Just 10) = newCell
- | otherwise = testCurrentCell sudoku i emptyList (increaseJust newCell)
-
-increaseCellBefore :: Sudoku -> Int -> [Pos] -> Cell
-increaseCellBefore sudoku i emptyList
- | isOkay $ update sudoku (emptyList!!i) (increaseJust cell) = (increaseJust cell)
- | cell == (Just 10) = increaseCellBefore sudoku (i-1) emptyList
- | otherwise = increaseCellBefore (update sudoku (emptyList!!i) (increaseJust cell)) i emptyList
-                where cell = getCell sudoku (emptyList!!i)
-
-increaseJust :: Cell -> Cell
-increaseJust (Just n) = (Just (n+1))
-
--- * F3
+possibleMoves :: Pos -> Sudoku -> [Sudoku]
+possibleMoves pos s = filter isOkay [update s pos (Just n) | n <- range]
+    where range = [1..9]
 
 
--- * F4
+readAndSolve :: FilePath -> IO ()
+readAndSolve filepath = do
+                        sudoku <- getSudoku filepath 
+                        printSudoku $ fromJust (solve sudoku)
+
+isSolutionOf :: Sudoku -> Sudoku -> Bool
+isSolutionOf solution sudoku = ((map (getCell sudoku) keptPos) == (map (getCell solution) keptPos)) && (isOkay solution)
+ where keptPos = ((blanks allBlankSudoku)\\(blanks sudoku))
+
+prop_SolveSound :: Sudoku -> Property
+prop_SolveSound s = isSudoku s && isOkay s && isJust (solve s) ==> fromJust (solve s) `isSolutionOf` s
