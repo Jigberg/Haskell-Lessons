@@ -25,7 +25,7 @@ startBoard :: Board
 startBoard = 
     Board
     [ [n  ,n  ,n  ,n  ,n  ,n  ,n  ,n  ]
-    , [n  ,n  ,j w,n  ,n  ,n  ,n  ,n  ]
+    , [n  ,n  ,n  ,n  ,n  ,n  ,n  ,n  ]
     , [n  ,n  ,n  ,n  ,n  ,n  ,n  ,n  ]
     , [n  ,n  ,n  ,j b,j w,n  ,n  ,n  ]
     , [n  ,n  ,n  ,j w,j b,n  ,n  ,n  ]
@@ -83,15 +83,41 @@ validPlacements b c = filter canFlip $ semiValid b c
 
 -- Checks if the placement can flip any pieces.
 flipCheck :: Board -> Color -> Pos -> Bool
-flipCheck b c pos = horizontal b c pos -- && vertical b c pos && diagonal b c pos
+flipCheck b c pos = horizontal b c pos || vertical b c pos && diagonalNeg b c pos
 
 -- Checks if a possible placement can flip any pieces horizontaly.
 horizontal :: Board -> Color -> Pos -> Bool
 horizontal b c (r,col)
- | getCell b (r,(col-1)) == Just (opposite c) && (col-2)>(-1) = lineCheck b c $ reverse $ filter color [(r,x) | x <- [0..col]]
- | getCell b (r,(col+1)) == Just (opposite c) && (col+2)<(8) = lineCheck b c $ filter color [(r,x) | x <- [col..7]]
+ | (getCell b (r,(col-1)) == Just (opposite c) && (col-2)>(-1)) && (getCell b (r,(col+1)) == Just (opposite c) && (col+2)<(8))
+  = (lineCheck b c $ reverse [(r,x) | x <- [0..(col-2)]]) || (lineCheck b c [(r,x) | x <- [(col+2)..7]])
+ | getCell b (r,(col-1)) == Just (opposite c) && (col-2)>(-1) = lineCheck b c $ reverse [(r,x) | x <- [0..(col-2)]]
+ | getCell b (r,(col+1)) == Just (opposite c) && (col+2)<(8) = lineCheck b c [(r,x) | x <- [(col+2)..7]]
  | otherwise = False
   where color pos = (getCell b pos) == (Just c)
+
+vertical :: Board -> Color -> Pos -> Bool
+vertical b c (r,col)
+ | (getCell b ((r-1),col) == Just (opposite c) && (r-2)>(-1)) && (getCell b ((r+1),col) == Just (opposite c) && (r+2)<(8))
+  = (lineCheck b c $ reverse [(x,col) | x <- [0..(r-2)]]) || (lineCheck b c $ [(x,col) | x <- [(r+2)..7]])
+ | getCell b ((r-1),col) == Just (opposite c) && (r-2)>(-1) = lineCheck b c $ reverse [(x,col) | x <- [0..(r-2)]]
+ | getCell b ((r+1),col) == Just (opposite c) && (r+2)<(8) = lineCheck b c $ [(x,col) | x <- [(r+2)..7]]
+ | otherwise = False
+  where color pos = (getCell b pos) == (Just c)
+
+diagonalNeg :: Board -> Color -> Pos -> Bool
+diagonalNeg b c (r,col)
+ |
+ | getCell b ((r-1),(col-1)) == Just (opposite c) && (r-2)>(-1) && (col-2)>(-1) = lineCheck b c $ reverse [(x,y) | x <- [0..(r-2)], y <- [0..(col-2)]]
+ | getCell b ((r+1),(col+1)) == Just (opposite c) && (r+2)<(8) && (col+2)<(8) = lineCheck b c $ [(x,y) | x <- [(r+2)..7], y <- [(col+2)..7]]
+ | otherwise = False
+
+diagonalPos :: Board -> Color -> Pos -> Bool
+diagonalPos b c (r,col)
+ |
+ | getCell b ((r-1),(col-1)) == Just (opposite c) && (r-2)>(-1) && (col-2)>(-1) = lineCheck b c $ reverse [(x,y) | x <- [0..(r-2)], y <- [0..(col-2)]]
+ | getCell b ((r+1),(col+1)) == Just (opposite c) && (r+2)<(8) && (col+2)<(8) = lineCheck b c $ [(x,y) | x <- [(r+2)..7], y <- [(col+2)..7]]
+ | otherwise = False
+
 
 -- Checks if a hor/ver/dia line from position x can result in a flip. 
 lineCheck :: Board -> Color -> [Pos] -> Bool
