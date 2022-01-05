@@ -261,7 +261,9 @@ aiPlay b c
 
 
 prop_updatedBoard :: Board -> Bool
-prop_updatedBoard b = isBoard (flipPieces (placePiece b White ((validPlacements b White)!!0)) White ((validPlacements b White)!!0) 0 )
+prop_updatedBoard b = isBoard flipBoard && (nonBlanks placeBoard) == (nonBlanks flipBoard)
+  where flipBoard = (flipPieces placeBoard White ((validPlacements b White)!!0) 0 )
+        placeBoard = (placePiece b White ((validPlacements b White)!!0))                
 
 -- Updates the board
 ---------------
