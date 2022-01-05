@@ -2,7 +2,7 @@ module Othello where
 
 import Test.QuickCheck
 import Data.List
-import Data.Char(digitToInt)
+import Data.Char
 import Data.Maybe
 
 --------------------
@@ -15,6 +15,7 @@ import Data.Maybe
    3. Typing:  "h" = Gives all the places where you can place a piece   "q" = Quits the game early
    4. To place you type for example "32".  3 is the row,  2 is the column ,  We start at 0.
    5. The game ends when the board is full or one color can't place. 
+
 
 -}
 
@@ -30,6 +31,8 @@ type Row = [Cell]
 type Pos = (Int,Int)
 
 data Board = Board [Row]
+ deriving ( Show, Eq )
+
 
 rows :: Board -> [Row]
 rows (Board ms) = ms
@@ -61,18 +64,20 @@ startBoard =
 
 -- Print the current Othello board.
 printBoard :: Board -> IO ()
-printBoard b = putStr $ boardToString b
+printBoard b = putStr $ concat $ map listToString (rows b)
 
-boardToString :: Board -> String
-boardToString (Board []) = ""
-boardToString (Board(x:xs)) = (listToString x "") ++ boardToString (Board xs)
+listToString :: [Cell] -> String
+listToString cList = (intersperse ' ' (concat $ map cellToString cList)) ++ "\n"
 
-listToString :: [Cell] -> String -> String
-listToString [] str = str ++ "\n"
-listToString (Nothing:xs) str = listToString xs (str ++ " " ++ ".")
-listToString ((Just White):xs) str = listToString xs (str ++ " " ++ "w")
-listToString ((Just Black):xs) str = listToString xs (str ++ " " ++ "b")
+cellToString :: Cell -> String
+cellToString cell
+ | cell == (Just Black) = "b"
+ | cell == (Just White) = "w"
+ | otherwise = "."
 
+
+allPositions :: [Pos]
+allPositions = [(n, k) | n <- [0..7], k <- [0..7]]
 
 -- Checks if the board is 8x8 in size. 
 boardSizeValid :: Board -> Bool
@@ -80,13 +85,28 @@ boardSizeValid b = (length r) == 8 && all (==8) (map length r)
   where r = rows b
 
 
+-- Return Aligning row positions, even outside the board
+directionList :: Int -> Int -> [[Pos]]
+directionList r col = [ 
+  [((r-x),col) | x <- l],
+  [((r-x),(col+x)) | x <- l ] ,
+  [(r,(col+x)) | x <- l ] ,
+  [((r+x),(col+x)) | x <- l ] ,
+  [((r+x),(col)) | x <- l ] ,
+  [((r+x),(col-x)) | x <- l ] ,
+  [((r),(col-x)) | x <- l ] ,
+  [((r-x),(col-x)) | x <- l ] ]
+   where l = [1..8]
+
+
+
 -- Return empty positions
 blanks :: Board -> [Pos]
-blanks (Board rows) = [ (n, k) | n <- [0..7], k <- [0..7], rows !! n !! k == Nothing ]
+blanks (Board rows) = [(n, k) | n <- [0..7], k <- [0..7], rows !! n !! k == Nothing]
 
 -- Return occupied positions
 nonBlanks :: Board -> [Pos]
-nonBlanks (Board rows) = [ (n, k) | n <- [0..7], k <- [0..7], rows !! n !! k /= Nothing ]
+nonBlanks (Board rows) = allPositions\\blanks (Board rows)
 
 
 -- Returns the positions of all the cells of one color.
@@ -114,6 +134,17 @@ replace :: [a] -> (Int,a) -> [a]
 replace list (i,item) = fst (splitAt i list) ++ [item] ++ (tail $ snd (splitAt i list))
 
 
+isBoard :: Board -> Bool
+isBoard b = all check1Row (rows b) && length (rows b) == 8
+
+check1Row :: Row -> Bool
+check1Row row = all checkCell row && length row == 8
+
+checkCell :: Cell -> Bool
+checkCell content
+ | content == Nothing || content == (Just Black) || content == (Just White) = True
+ | otherwise = False
+
 
 -- The main game loop
 ---------------------------
@@ -125,63 +156,40 @@ main = do
        putStrLn "Type 'ai' to play against computer / leave blank for 1vs1"
        input <- getLine
        if isSubsequenceOf "ai" input 
-         then playOthello startBoard White True
-         else playOthello startBoard White False
+         then gameLoop startBoard White True
+         else gameLoop startBoard White False
 
 
-
--- The game loop. Can be started with an ai to play singlePlayer.
-playOthello :: Board -> Color -> Bool -> IO ()
-playOthello b c ai =
-
-  do
-  printBoard b
-  putStrLn (colorName c ++ " turn, choose a postition.")
-  input <- getLine
-
-  -- Show the player where they can place
-  if (elem 'h' input)
-    then do
-         putStr (show (validPlacements b c) ++ "\n")
-         playOthello b c ai
-
-     -- End the game if the color can't place
-     else if (length (validPlacements b c) == 0) 
-       then putStrLn (colorName c ++ " can't play, " ++ colorName (opposite c) ++ " is the Winner!")
-
-        -- End the game if "q" or if the board is full
-        else if (length $ blanks b) == 0 || (elem 'q' input)
-          then declareWinner b
-  
-          -- If the input was unvalid, make them pick again
-          else if (length $ inputList input) < 2
-            then do 
-                 putStr "Sorry, I didn't understand that.\n"
-                 playOthello b c ai
-                        
-            -- If the spot is unvalid, make them pick again
-            else if not(elem (findPos $ inputList input) $ validPlacements b c)
-              then do
-                   putStr "You can't place there\n"
-                   playOthello b c ai
- 
-              -- If there is no Ai the other color gets to play
-              else if ai /= True
-                then playOthello (newBoard input) (opposite c) ai
-                               
-                -- Ends the game if the Ai can't play
-                else if (length (validPlacements (newBoard input) Black)) == 0 
-                  then putStrLn "Black can't play, White is the Winner"
-                  else do
-                       printBoard (newBoard input)
-                       putStr "Black has placed\n"
-                       playOthello ( aiTakeTurn (newBoard input) (opposite c) ) c ai
-
-  where inputList input = map digitToInt $ filterNumbers input ""
-        newBoard input = flipPieces (placePiece b c (findPos $ inputList input)) c (findPos $ inputList input)0
-                     
+gameLoop :: Board -> Color -> Bool -> IO ()
+gameLoop b c ai = do
+                  printBoard b
+                  putStrLn (colorName c ++ " turn, choose a postition.")
+                  input <- getLine
+                  loop b c ai input
 
 
+loop :: Board -> Color -> Bool -> String -> IO ()
+loop b c ai s
+ | elem 'h' s = messageRestart b c ai (show (validPlacements b c) ++ "\n")
+ | (length (validPlacements b c) == 0) = putStrLn (colorName c ++ " can't play, " ++ colorName (opposite c) ++ " is the Winner!")
+ | (length $ blanks b) == 0 || (elem 'q' s) = declareWinner b
+ | (length $ inputList s) < 2 = messageRestart b c ai "Sorry, I didn't understand that.\n"
+ | not(elem (findPos $ inputList s) $ validPlacements b c) = messageRestart b c ai "You can't place there\n"
+ | not(ai) = gameLoop newBoard (opposite c) ai
+ | (length (validPlacements newBoard Black)) == 0 = putStrLn "Black can't play, White is the Winner"
+ | otherwise = aiTurn b c ai s
+  where newBoard  = flipPieces (placePiece b c (findPos $ inputList s)) c (findPos $ inputList s) 0
+
+messageRestart :: Board -> Color -> Bool -> String -> IO ()
+messageRestart b c ai s = do
+                             putStr s
+                             gameLoop b c ai
+
+aiTurn :: Board -> Color -> Bool -> String -> IO ()
+aiTurn b c ai s = do
+                printBoard b
+                putStr "Black has placed\n"
+                gameLoop ( aiTakeTurn (flipPieces (placePiece b c (findPos $ inputList s)) c (findPos $ inputList s) 0) (opposite c) ) c ai
 
 -- Chooses on of the valid positions to place on.
 aiTakeTurn :: Board -> Color -> Board
@@ -191,29 +199,69 @@ aiTakeTurn b c = (flipPieces (placePiece b c (aiPos b c) ) c (aiPos b c) ) 0
 aiPos :: Board -> Color -> Pos
 aiPos b c = head $ validPlacements b c
 
+inputList :: String -> [Int]
+inputList s = map digitToInt $ filter isDigit s
+
 
 -- Declares the color with the most pieces the winner or if there is a tie!
 declareWinner :: Board -> IO ()
 declareWinner b
- | (length $ colorCells b White) > (length $ colorCells b Black)
- = putStrLn ("White is the Winner!  Score: " ++ show (length $ colorCells b White) ++ " - " ++ show (length $ colorCells b Black))
- | (length $ colorCells b White) < (length $ colorCells b Black)
- = putStrLn ("Black is the Winner!  Score: " ++ show (length $ colorCells b Black) ++ " - " ++ show (length $ colorCells b White) )
+ | count White > count Black = message White
+ | count White < count Black = message Black
  | otherwise = putStrLn "It is a tie!"
+  where count c = length $ colorCells b c
+        message c = putStrLn ( (colorName c) ++ " is the Winner!  White - " ++ show (count White) ++ "  Black - " ++ show (count Black) )
 
 -- Returns a postion
 findPos :: [Int] -> Pos
 findPos list = ((list!!0),(list!!1))
 
--- Returns a string only containing digits.
-filterNumbers :: String -> String -> String
-filterNumbers [] new = reverse new
-filterNumbers (x:xs) new
- | elem x ['0','1','2','3','4','5','6','7','8','9'] = filterNumbers xs ([x]++new)
- | otherwise = filterNumbers xs new
+
+
+-- Tests - QuickCheck 
+-----------------
 
 
 
+rStartPosition :: Gen (Pos)
+rStartPosition = do
+                 x <- elements [0..6]
+                 y <- elements [0..6]
+                 return (x,y)
+
+rColor :: Gen (Color)
+rColor = elements [White,Black]
+
+instance Arbitrary Board where
+  arbitrary = do
+    pos <- rStartPosition
+    c <- rColor
+    return (placeSquare (Board (replicate 8 (replicate 8 Nothing))) pos c 3)
+
+
+placeSquare :: Board -> Pos -> Color -> Int -> Board
+placeSquare b (row,col) c (-1) = b
+placeSquare b (row,col) c i = placeSquare ( placePiece b c (posList!!i) ) (row,col) (opposite c) (i-1)
+  where posList = [(row,col+1),(row,col),(row+1,col),(row+1,col+1)]
+
+
+prop_Board :: Board -> Bool
+prop_Board b = isBoard b
+
+
+prop_play :: Board -> Bool
+prop_play b = aiPlay b White
+
+
+aiPlay :: Board -> Color -> Bool
+aiPlay b c
+ | length (validPlacements b c) == 0 = True
+ | length (validPlacements b c) /= 0 = aiPlay (flipPieces (placePiece b c ((validPlacements b c)!!0)) c ((validPlacements b c)!!0) 0 ) (opposite c)
+ | otherwise = False
+
+
+prop_updatedBoard :: Board -> Bool
+prop_updatedBoard b = isBoard (flipPieces (placePiece b White ((validPlacements b White)!!0)) White ((validPlacements b White)!!0) 0 )
 
 -- Updates the board
 ---------------
@@ -224,18 +272,11 @@ filterNumbers (x:xs) new
 placePiece :: Board -> Color -> Pos -> Board
 placePiece b c (r,col) = Board(replace (rows b) (r, (replace (rows b !! r) (col,Just(c)))))
 
+
 -- Flips all pieces that should be flipped given a position and color. 
 flipPieces :: Board -> Color -> Pos -> Int -> Board
-flipPieces b c (r,col) i
- | i == 0 = flipPieces (flipList b c (createflipList b c  ([((r-x),col) | x <- [1..8]])  []))       c (r,col) (i+1) -- 12:00
- | i == 1 = flipPieces (flipList b c (createflipList b c  ([((r-x),(col+x)) | x <- [1..8] ])  []))  c (r,col) (i+1) -- 13:30
- | i == 2 = flipPieces (flipList b c (createflipList b c  ([(r,(col+x)) | x <- [1..8] ])  []))      c (r,col) (i+1) -- 15:00
- | i == 3 = flipPieces (flipList b c (createflipList b c  ([((r+x),(col+x)) | x <- [1..8] ])  []))  c (r,col) (i+1) -- 16:30
- | i == 4 = flipPieces (flipList b c (createflipList b c  ([((r+x),(col)) | x <- [1..8] ])  []))    c (r,col) (i+1) -- 18:00
- | i == 5 = flipPieces (flipList b c (createflipList b c  ([((r+x),(col-x)) | x <- [1..8] ])  []))  c (r,col) (i+1) -- 19:30
- | i == 6 = flipPieces (flipList b c (createflipList b c  ([((r),(col-x)) | x <- [1..8] ])  []))    c (r,col) (i+1) -- 21:00
- | i == 7 = flipPieces (flipList b c (createflipList b c  ([((r-x),(col-x)) | x <- [1..8] ])  []))  c (r,col) (i+1) -- 22:30
- | otherwise = b
+flipPieces b c (r,col) 8 = b
+flipPieces b c (r,col) i = flipPieces (flipList b c (createflipList b c  ((directionList r col) !!i) [] )) c (r,col) (i+1)
 
 
 -- Creates a list for 1 direction of pieces needed to be flipped.
@@ -268,15 +309,10 @@ validPlacements b c = filter canFlip $ semiValid b c
 
 -- Checks if a placement can flip any pieces in on of the 8 directions. 
 flipCheck :: Board -> Color -> Pos -> Int -> Bool
-flipCheck b c (r,col) 0 = if lineCheck b c [((r-x),col) | x <- [1..8]]     then True else flipCheck b c (r,col) 1 -- 12:00
-flipCheck b c (r,col) 1 = if lineCheck b c [((r-x),(col+x)) | x <- [1..8]] then True else flipCheck b c (r,col) 2 -- 13:30
-flipCheck b c (r,col) 2 = if lineCheck b c [(r,(col+x)) | x <- [1..8]]     then True else flipCheck b c (r,col) 3 -- 15:00
-flipCheck b c (r,col) 3 = if lineCheck b c [((r+x),(col+x)) | x <- [1..8]] then True else flipCheck b c (r,col) 4 -- 16:30
-flipCheck b c (r,col) 4 = if lineCheck b c [((r+x),(col)) | x <- [1..8]]   then True else flipCheck b c (r,col) 5 -- 18:00
-flipCheck b c (r,col) 5 = if lineCheck b c [((r+x),(col-x)) | x <- [1..8]] then True else flipCheck b c (r,col) 6 -- 19:30
-flipCheck b c (r,col) 6 = if lineCheck b c [((r),(col-x)) | x <- [1..8]]   then True else flipCheck b c (r,col) 7 -- 21:00
-flipCheck b c (r,col) 7 = if lineCheck b c [((r-x),(col-x)) | x <- [1..8]] then True else flipCheck b c (r,col) 8 -- 22:30
 flipCheck b c (r,col) 8 = False
+flipCheck b c (r,col) i
+ | lineCheck b c ((directionList r col)!!i) = True
+ | otherwise = flipCheck b c (r,col) (i+1)
 
 
 -- Checks if a placement will flip any pieces in a given list.
